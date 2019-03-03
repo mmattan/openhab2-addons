@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
 
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.library.types.DecimalType;
+import org.eclipse.smarthome.core.library.types.HSBType;
+import org.eclipse.smarthome.core.library.types.IncreaseDecreaseType;
 import org.eclipse.smarthome.core.library.types.OnOffType;
 import org.eclipse.smarthome.core.library.types.PercentType;
 import org.eclipse.smarthome.core.library.types.StopMoveType;
@@ -57,6 +59,7 @@ import org.openhab.binding.loxone.internal.core.LxCategory;
 import org.openhab.binding.loxone.internal.core.LxContainer;
 import org.openhab.binding.loxone.internal.core.LxControl;
 import org.openhab.binding.loxone.internal.core.LxControlBurglarAlarm;
+import org.openhab.binding.loxone.internal.core.LxControlColorPickerV2;
 import org.openhab.binding.loxone.internal.core.LxControlDimmer;
 import org.openhab.binding.loxone.internal.core.LxControlInfoOnlyAnalog;
 import org.openhab.binding.loxone.internal.core.LxControlInfoOnlyDigital;
@@ -99,6 +102,7 @@ public class LoxoneMiniserverHandler extends BaseThingHandler implements LxServe
     private ChannelTypeUID roAnalogTypeId = new ChannelTypeUID(BINDING_ID, MINISERVER_CHANNEL_TYPE_RO_ANALOG);
     private ChannelTypeUID roTimedSwitchDeactivationDelayTypeId = new ChannelTypeUID(BINDING_ID,
             MINISERVER_CHANNEL_TYPE_RO_NUMBER);
+    private ChannelTypeUID colorPickerTypeId = new ChannelTypeUID(BINDING_ID, MINISERVER_CHANNEL_TYPE_COLORPICKER);
 
     private Logger logger = LoggerFactory.getLogger(LoxoneMiniserverHandler.class);
     private Map<ChannelUID, LxControl> controls = new HashMap<>();
@@ -131,6 +135,7 @@ public class LoxoneMiniserverHandler extends BaseThingHandler implements LxServe
         }
 
         LxControl control = getControlFromChannelUID(channelUID);
+
         if (control == null) {
             // This situation should not happen under normal circumstances, it indicates binding somehow lost its
             // controls
@@ -262,6 +267,33 @@ public class LoxoneMiniserverHandler extends BaseThingHandler implements LxServe
                     }
                 }
             }
+
+            if (control instanceof LxControlColorPickerV2) {
+                LxControlColorPickerV2 colorPicker = (LxControlColorPickerV2) control;
+
+                if (command instanceof HSBType) {
+                    colorPicker.setColor((HSBType) command);
+                } else if (command instanceof OnOffType) {
+                    if (command == OnOffType.ON) {
+                        colorPicker.on();
+                    } else {
+                        colorPicker.off();
+                    }
+                } else if (command instanceof DecimalType) {
+                    colorPicker.setBrightness((DecimalType) command);
+                } else if (command instanceof PercentType) {
+                    colorPicker.setBrightness((PercentType) command);
+                } else if (command instanceof IncreaseDecreaseType) {
+                    if (((IncreaseDecreaseType) command).equals(IncreaseDecreaseType.INCREASE)) {
+                        colorPicker.increaseDecreaseBrightness(1);
+                    } else {
+                        colorPicker.increaseDecreaseBrightness(-1);
+                    }
+                }
+
+                return;
+            }
+
             logger.debug("Incompatible operation on control {}", control.getUuid());
         } catch (IOException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
@@ -402,7 +434,12 @@ public class LoxoneMiniserverHandler extends BaseThingHandler implements LxServe
                 updateThing(builder.build());
                 return;
             }
+        } else if (control instanceof LxControlColorPickerV2) {
+            LxControlColorPickerV2 colorPicker = (LxControlColorPickerV2) control;
+
+            updateState(channelId, colorPicker.getColor());
         }
+
         // for all state updates not handled above just update the channel state the regular way
         updateChannelStates(channelId, control);
     }
@@ -593,7 +630,10 @@ public class LoxoneMiniserverHandler extends BaseThingHandler implements LxServe
             addChannel(channels, "Dimmer", dimmerTypeId, id, label, "Dimmer", tags);
         } else if (control instanceof LxControlBurglarAlarm) {
             addChannel(channels, "Switch", switchTypeId, id, label, "Alarm", tags);
+        } else if (control instanceof LxControlColorPickerV2) {
+            addChannel(channels, "Color", colorPickerTypeId, id, label, "Color Picker", tags);
         }
+
         return channels;
     }
 

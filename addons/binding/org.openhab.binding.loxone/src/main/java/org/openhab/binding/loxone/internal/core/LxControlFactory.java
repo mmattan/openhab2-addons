@@ -40,6 +40,7 @@ class LxControlFactory {
         add(new LxControlTextState.Factory());
         add(new LxControlTimedSwitch.Factory());
         add(new LxControlBurglarAlarm.Factory());
+        add(new LxControlColorPickerV2.Factory());
     }
 
     private static Map<String, LxControlInstance> controls;
